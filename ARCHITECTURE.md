@@ -17,6 +17,8 @@ são interceptadas e reimplementadas.
   As chaves vêm do **dump/console do próprio usuário**, nunca do repo.
 - **Sem marca.** Identificação é pelo **game ID** (`RMGE01`), não pelo nome
   comercial.
+- **Proveniência obrigatória.** Todo código derivado referencia sua origem no
+  binário (endereço no `main.dol`). Regra em [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
 
 ## Visão geral do pipeline
 

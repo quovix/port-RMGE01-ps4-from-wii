@@ -28,6 +28,11 @@ binário proprietário é incluído, e o nome comercial do jogo não aparece aqu
 identificação é pelo **game ID** do disco. A execução exige o **dump do próprio
 disco do usuário** (bring-your-own-dump); nada de terceiros é redistribuído.
 
+## Regras
+
+- **Proveniência obrigatória** — todo código derivado referencia sua origem no
+  binário original. Ver [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
+
 ## Padrão
 
 Identificação, versionamento e mapeamento para git seguem
