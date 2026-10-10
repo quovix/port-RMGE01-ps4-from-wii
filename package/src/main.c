@@ -13,32 +13,14 @@
 #include "../../product/media/media_verify.h"
 #include "../../product/media/manifest_rmge01.h"
 
-/* Notificação on-screen (prova visível de boot). */
-typedef struct {
-    int type;
-    int req_id;
-    int priority;
-    int msg_id;
-    int target_id;
-    int user_id;
-    int unk1;
-    int unk2;
-    int app_id;
-    int error_num;
-    int unk3;
-    char use_icon_image_uri;
-    char message[1024];
-    char icon_uri[1024];
-    char unk[1024];
-} OrbisNotificationRequest;
-
+/* Notificação on-screen (prova visível de boot).
+   OrbisNotificationRequest vem de <orbis/_types/kernel.h> (via libkernel.h). */
 static void notify(const char *msg) {
     OrbisNotificationRequest req;
     memset(&req, 0, sizeof req);
     req.type = 0;
-    req.unk3 = 0;
-    req.use_icon_image_uri = 1;
-    req.target_id = -1;
+    req.targetId = -1;
+    req.useIconImageUri = 0;   /* sem ícone custom por enquanto */
     strncpy(req.message, msg, sizeof(req.message) - 1);
     sceKernelSendNotificationRequest(0, &req, sizeof req, 0);
 }
@@ -59,6 +41,9 @@ static const char *find_user_media(void) {
 }
 
 int main(void) {
+    /* Gotcha OpenOrbis: sem esconder o splash, o sistema mata o app ("crash"). */
+    sceSystemServiceHideSplashScreen();
+
     notify("quovix — casca v0 iniciada (" QVX_GAME_ID ")");
 
     const char *media = find_user_media();
