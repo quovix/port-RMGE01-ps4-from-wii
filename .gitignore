@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.DS_Store
+/out/
+/build/
+/dumps/
+*.rvz
+*.iso
+*.wbfs
+*.dol
