@@ -8,3 +8,7 @@ __pycache__/
 *.iso
 *.wbfs
 *.dol
+package/build/
+package/*.pkg
+package/pkg.gp4
+package/sce_sys/param.sfo

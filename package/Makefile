@@ -59,7 +59,7 @@ sce_sys/param.sfo: Makefile
 
 eboot.bin: $(OBJS)
 	$(LD) $(INTDIR)/*.o -o $(INTDIR)/eboot.elf $(LDFLAGS)
-	$(TOOLCHAIN)/bin/$(CDIR)/create-fself -in=$(INTDIR)/eboot.elf -out=$(INTDIR)/eboot.oelf --eboot "eboot.bin" --paid 0x3800000000000011
+	$(TOOLCHAIN)/bin/$(CDIR)/create-fself-macos -in=$(INTDIR)/eboot.elf -out=$(INTDIR)/eboot.oelf --eboot "eboot.bin" --paid 0x3800000000000011
 
 $(INTDIR)/%.o: %.c
 	$(CC) $(CFLAGS) -o $@ $<
