@@ -3,6 +3,8 @@
 #include "backend_bringup.h"
 #include "mtx.h"
 #include "gx_vi.h"
+#include "os.h"
+#include "dvd.h"
 #include "../../video/text.h"
 #include <math.h>
 #include <stdio.h>
@@ -74,5 +76,26 @@ int qvx_backend_bringup(void) {
     snprintf(line, sizeof line, "backend GX/VI: online (fifo=%p)", (void *)fifo);
     qvx_log_line(line);
 
-    return g_total - g_pass;                  /* 0 = tudo passou */
+    /* 3) OS: init + prova que OSReport chega no klog E na tela ------------- */
+    qvx_log_line("backend: init OS (qvx_os_init + OSReport)...");
+    qvx_os_init();
+    OSReport("backend OS: OSReport -> klog+tela OK\n");  /* roteia p/ qvx_log_line */
+
+    /* 4) DVD: init + abre um arquivo do DUMP DO USUÁRIO e reporta o tamanho.
+       Prova o backend de disco no hardware (BYO-dump). Ausência de dump não é
+       falha da casca — só sinaliza. */
+    qvx_log_line("backend: init DVD (DVDInit + abrir do dump)...");
+    DVDInit();
+    s32 ent = DVDConvertPathToEntrynum("/LayoutData/TitleLogo.arc");
+    DVDFileInfo fi;
+    if (ent >= 0 && DVDOpen("/LayoutData/TitleLogo.arc", &fi)) {
+        snprintf(line, sizeof line, "backend DVD: TitleLogo.arc ent=%d len=%u bytes",
+                 (int)ent, (unsigned)DVDGetLength(&fi));
+        qvx_log_line(line);
+        DVDClose(&fi);
+    } else {
+        qvx_log_line("backend DVD: dump ausente/arquivo nao achado (BYO-dump)");
+    }
+
+    return g_total - g_pass;                  /* 0 = MTX passou (saúde do bring-up) */
 }

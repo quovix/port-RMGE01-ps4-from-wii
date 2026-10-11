@@ -19,6 +19,7 @@ SRC_C       := src/main.c ../product/media/media_verify.c ../product/media/sha1.
                ../product/art/art_splash.c ../product/art/yaz0.c \
                ../product/art/rarc.c ../product/art/tpl.c \
                ../runtime/platform/orbis/mtx.c ../runtime/platform/orbis/gx_vi.c \
+               ../runtime/platform/orbis/os.c ../runtime/platform/orbis/dvd.c \
                ../runtime/platform/orbis/backend_bringup.c
 SRC_CPP     := ../runtime/compat/heap_new.cpp ../runtime/compat/heap_smoke.cpp
 INCLUDES    := -I../product/media -I../runtime/compat -I../runtime/video -I../product/art \
