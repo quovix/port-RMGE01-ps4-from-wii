@@ -15,6 +15,7 @@
 #include "../../runtime/compat/heap_smoke.h"
 #include "../../runtime/compat/scalar_math.h"
 #include "../../runtime/video/video_out.h"
+#include "../../product/art/art_splash.h"
 
 /* Log no klog (capturável via GoldHEN:3232). Instrumenta cada passo pra
    localizar exatamente onde um eventual crash acontece. */
@@ -102,10 +103,23 @@ int main(void) {
     }
     klog("passo 5 ok: video-out ativo; present loop");
 
-    /* Mount do motor = stub. Por ora a casca desenha um fundo cósmico próprio;
-       a arte do jogo (lida do dump em runtime) entra aqui depois do blit. */
+    /* Splash: textura de branding lida do DUMP DO USUÁRIO em runtime (BYO-dump).
+       Nenhum asset embarcado; a arte vive só no console, vinda do dump do dono.
+       Fallback para fundo cósmico próprio se o dump não estiver presente. */
+    static uint32_t splash[512 * 288];
+    uint32_t sw = 0, sh = 0;
+    int have_splash = (qvx_art_load_tpl_from_arc(
+        "/data/quovix/RMGE01/files/LayoutData/TitleLogo.arc", "mytitlelogo.tpl",
+        splash, 512 * 288, &sw, &sh) == 0);
+    if (have_splash) {
+        klog("splash: carregado do dump; blit ativo");
+    } else {
+        klog("splash: nao encontrado no dump; fundo cosmico");
+    }
+
     for (;;) {
-        qvx_video_clear(0xFF0A1020);   /* azul-petróleo escuro (original) */
+        qvx_video_clear(0xFF0A1020);               /* azul-petróleo escuro (original) */
+        if (have_splash) qvx_video_blit_centered(splash, (int)sw, (int)sh);
         qvx_video_present();
     }
     return 0;
