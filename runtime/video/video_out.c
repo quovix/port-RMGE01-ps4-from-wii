@@ -68,3 +68,31 @@ void qvx_video_present(void) {
     sceVideoOutWaitVblank();
     g_active ^= 1;
 }
+
+void qvx_video_blit_rgba(const uint32_t *src, int sw, int sh, int dx, int dy) {
+    if (g_video < 0 || !src) return;
+    uint32_t *fb = g_fb[g_active];
+    for (int y = 0; y < sh; y++) {
+        int oy = dy + y;
+        if (oy < 0 || oy >= QVX_H) continue;
+        for (int x = 0; x < sw; x++) {
+            int ox = dx + x;
+            if (ox < 0 || ox >= QVX_W) continue;
+            uint32_t sp = src[(size_t)y * sw + x];
+            uint32_t a = sp >> 24;
+            if (a == 0) continue;
+            if (a == 0xFF) { fb[(size_t)oy * QVX_W + ox] = sp; continue; }
+            /* composição alpha sobre o destino (0xAARRGGBB) */
+            uint32_t dp = fb[(size_t)oy * QVX_W + ox];
+            uint32_t sr=(sp>>16)&0xFF, sg=(sp>>8)&0xFF, sb=sp&0xFF;
+            uint32_t dr=(dp>>16)&0xFF, dg=(dp>>8)&0xFF, db=dp&0xFF;
+            uint32_t ia = 255 - a;
+            uint32_t rr=(sr*a + dr*ia)/255, rg=(sg*a + dg*ia)/255, rb=(sb*a + db*ia)/255;
+            fb[(size_t)oy * QVX_W + ox] = 0xFF000000u | rr<<16 | rg<<8 | rb;
+        }
+    }
+}
+
+void qvx_video_blit_centered(const uint32_t *src, int sw, int sh) {
+    qvx_video_blit_rgba(src, sw, sh, (QVX_W - sw) / 2, (QVX_H - sh) / 2);
+}

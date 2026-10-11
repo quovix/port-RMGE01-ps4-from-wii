@@ -23,4 +23,11 @@ void qvx_video_clear(uint32_t argb);
 /* Apresenta o back buffer (flip + vblank) e alterna pro próximo. */
 void qvx_video_present(void);
 
+/* Blita uma imagem RGBA (0xAARRGGBB, sw*sh) no back buffer em (dx,dy), com
+   composição alpha sobre o conteúdo atual e clip nas bordas. */
+void qvx_video_blit_rgba(const uint32_t *src, int sw, int sh, int dx, int dy);
+
+/* Blita centralizado no back buffer. */
+void qvx_video_blit_centered(const uint32_t *src, int sw, int sh);
+
 #endif
