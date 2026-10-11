@@ -117,10 +117,16 @@ int main(void) {
         klog("splash: nao encontrado no dump; fundo cosmico");
     }
 
-    for (;;) {
+    /* Conteúdo estático: desenha a splash UMA vez em AMBOS os framebuffers e
+       depois só alterna buffers idênticos. Sem redesenho por frame -> sem o
+       flicker que o clear+blit a cada flip causava no double-buffer. */
+    for (int i = 0; i < 2; i++) {
         qvx_video_clear(0xFF0A1020);               /* azul-petróleo escuro (original) */
         if (have_splash) qvx_video_blit_centered(splash, (int)sw, (int)sh);
         qvx_video_present();
+    }
+    for (;;) {
+        qvx_video_present();                        /* flip entre buffers idênticos */
     }
     return 0;
 }
