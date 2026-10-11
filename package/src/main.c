@@ -17,6 +17,7 @@
 #include "../../runtime/video/video_out.h"
 #include "../../runtime/video/text.h"
 #include "../../product/art/art_splash.h"
+#include "../../runtime/platform/orbis/backend_bringup.h"
 
 /* Log no klog (capturável via GoldHEN:3232). Instrumenta cada passo pra
    localizar exatamente onde um eventual crash acontece. */
@@ -118,7 +119,15 @@ int main(void) {
     } else {
         klog("splash: nao encontrado no dump; fundo cosmico");
     }
-    klog("casca pronta. motor: aguardando backend orbis.");
+    klog("casca pronta. iniciando bring-up do backend orbis...");
+
+    /* Backend bring-up: valida os slices que já temos (MTX + GX/VI) no
+       hardware e loga na tela. Tira a casca do estado "aguardando". */
+    int bk = qvx_backend_bringup();
+    if (bk == 0)
+        klog("backend orbis ONLINE (GX/VI + MTX). proximos slices: GNM/OS.");
+    else
+        klog("backend orbis: bring-up com falhas (ver linhas MTX acima).");
 
     /* Conteúdo estático: desenha a splash + o log UMA vez em AMBOS os
        framebuffers e depois só alterna buffers idênticos. Sem redesenho por

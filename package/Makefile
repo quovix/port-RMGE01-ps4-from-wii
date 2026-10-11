@@ -17,9 +17,12 @@ SRC_C       := src/main.c ../product/media/media_verify.c ../product/media/sha1.
                ../runtime/compat/scalar_math.c ../runtime/compat/math_smoke.c \
                ../runtime/video/video_out.c ../runtime/video/text.c \
                ../product/art/art_splash.c ../product/art/yaz0.c \
-               ../product/art/rarc.c ../product/art/tpl.c
+               ../product/art/rarc.c ../product/art/tpl.c \
+               ../runtime/platform/orbis/mtx.c ../runtime/platform/orbis/gx_vi.c \
+               ../runtime/platform/orbis/backend_bringup.c
 SRC_CPP     := ../runtime/compat/heap_new.cpp ../runtime/compat/heap_smoke.cpp
-INCLUDES    := -I../product/media -I../runtime/compat -I../runtime/video -I../product/art
+INCLUDES    := -I../product/media -I../runtime/compat -I../runtime/video -I../product/art \
+               -I../runtime/platform/orbis
 
 # --- toolchain --------------------------------------------------------------
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
@@ -41,7 +44,7 @@ CXXFLAGS    := $(CFLAGS) -std=c++98 -fno-exceptions -fno-rtti
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
-VPATH       := src:../product/media:../runtime/compat:../runtime/video:../product/art
+VPATH       := src:../product/media:../runtime/compat:../runtime/video:../product/art:../runtime/platform/orbis
 
 _unused     := $(shell mkdir -p $(INTDIR))
 

@@ -19,6 +19,7 @@ int qvx_video_width(void)  { return QVX_W; }
 int qvx_video_height(void) { return QVX_H; }
 
 int qvx_video_init(void) {
+    if (g_video >= 0) return 0;          /* idempotente: já aberto (casca + gx_vi) */
     const size_t fb_bytes = (size_t)QVX_W * QVX_H * 4;
     size_t total = fb_bytes * QVX_NBUF;
     total = (total + QVX_ALIGN - 1) / QVX_ALIGN * QVX_ALIGN;
