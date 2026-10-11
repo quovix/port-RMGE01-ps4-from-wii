@@ -15,7 +15,7 @@ LIBS        := -lc -lkernel -lc++ -lSceSystemService -lSceVideoOut
 # --- fontes (nosso código; o motor entra depois) ----------------------------
 SRC_C       := src/main.c ../product/media/media_verify.c ../product/media/sha1.c \
                ../runtime/compat/scalar_math.c ../runtime/compat/math_smoke.c \
-               ../runtime/video/video_out.c \
+               ../runtime/video/video_out.c ../runtime/video/text.c \
                ../product/art/art_splash.c ../product/art/yaz0.c \
                ../product/art/rarc.c ../product/art/tpl.c
 SRC_CPP     := ../runtime/compat/heap_new.cpp ../runtime/compat/heap_smoke.cpp

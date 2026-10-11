@@ -15,6 +15,7 @@
 #include "../../runtime/compat/heap_smoke.h"
 #include "../../runtime/compat/scalar_math.h"
 #include "../../runtime/video/video_out.h"
+#include "../../runtime/video/text.h"
 #include "../../product/art/art_splash.h"
 
 /* Log no klog (capturável via GoldHEN:3232). Instrumenta cada passo pra
@@ -23,6 +24,7 @@ static void klog(const char *msg) {
     sceKernelDebugOutText(0, "[quovix] ");
     sceKernelDebugOutText(0, msg);
     sceKernelDebugOutText(0, "\n");
+    qvx_log_line(msg);            /* também aparece na tela */
 }
 
 /* Notificação on-screen (prova visível de boot).
@@ -116,13 +118,16 @@ int main(void) {
     } else {
         klog("splash: nao encontrado no dump; fundo cosmico");
     }
+    klog("casca pronta. motor: aguardando backend orbis.");
 
-    /* Conteúdo estático: desenha a splash UMA vez em AMBOS os framebuffers e
-       depois só alterna buffers idênticos. Sem redesenho por frame -> sem o
-       flicker que o clear+blit a cada flip causava no double-buffer. */
+    /* Conteúdo estático: desenha a splash + o log UMA vez em AMBOS os
+       framebuffers e depois só alterna buffers idênticos. Sem redesenho por
+       frame -> sem o flicker do double-buffer. */
     for (int i = 0; i < 2; i++) {
         qvx_video_clear(0xFF0A1020);               /* azul-petróleo escuro (original) */
         if (have_splash) qvx_video_blit_centered(splash, (int)sw, (int)sh);
+        qvx_text_draw(20, 16, "QUOVIX  [PORT][RMGE01][PS4<-WII]", 0xFFFFFFFF, 2);
+        qvx_log_render(20, 52, 0xFF80FF80, 2);     /* log on-screen (verde) */
         qvx_video_present();
     }
     for (;;) {
