@@ -23,7 +23,7 @@ def source_path(entry):
     return (Path(entry["directory"]) / entry["file"]).resolve()
 
 
-def adapt_arguments(entry, compiler, target, mode, output, delayed, preincludes=(), overlays=()):
+def adapt_arguments(entry, compiler, target, mode, output, delayed, preincludes=(), overlays=(), extra=()):
     """Preserva includes/defines; substitui target, ação e saída do compile DB.
 
     Só aceita argv de clang: comandos MWCC precisam de outra tradução. Nunca
@@ -68,6 +68,7 @@ def adapt_arguments(entry, compiler, target, mode, output, delayed, preincludes=
         result += ["-ivfsoverlay", str(overlay)]
     result += ["-fno-color-diagnostics", "-fno-caret-diagnostics",
                "-Wno-unknown-pragmas", "-ferror-limit=20"]
+    result += list(extra)
     if mode == "syntax":
         result.append("-fsyntax-only")
     else:
@@ -113,6 +114,10 @@ def main():
                         help="header próprio de compatibilidade, antes de cada TU")
     parser.add_argument("--vfs-overlay", type=Path, action="append", default=[],
                         help="mapeamento clang de headers para adapters próprios")
+    parser.add_argument("--fpic", action="store_true",
+                        help="injeta -fPIC em cada TU (necessário para eboot PIE)")
+    parser.add_argument("--extra-arg", action="append", default=[],
+                        help="flag extra de clang por TU; repetível (ex. ataque a ODR)")
     args = parser.parse_args()
     compiler = shutil.which(args.compiler)
     if not compiler:
@@ -137,9 +142,11 @@ def main():
         # Não sobrescrever evidência de uma execução anterior.
         if (output / "report.json").exists() or (output / "results.jsonl").exists():
             parser.error("destino já contém medição; escolha outro --out")
+        extra = (["-fPIC"] if args.fpic else []) + list(args.extra_arg)
         commands = [adapt_arguments(entry, compiler, args.target, args.mode,
                                    output / "objects" / (str(i) + ".o"),
-                                   not args.strict_templates, preincludes, overlays)
+                                   not args.strict_templates, preincludes, overlays,
+                                   extra)
                     for i, entry in enumerate(selected)]
     except (OSError, ValueError, KeyError, TypeError) as error:
         parser.error(str(error))
@@ -184,6 +191,7 @@ def main():
         "compile_db_sha256": hashlib.sha256(raw).hexdigest(),
         "compiler": version, "target": args.target or "host",
         "mode": args.mode, "delayed_template_parsing": not args.strict_templates,
+        "extra_args": extra,
         "preincludes": [{"path": str(header), "sha256": hashlib.sha256(header.read_bytes()).hexdigest()}
                         for header in preincludes],
         "overlays": [{"path": str(overlay), "sha256": hashlib.sha256(overlay.read_bytes()).hexdigest()}
