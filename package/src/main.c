@@ -12,6 +12,17 @@
 
 #include "../../product/media/media_verify.h"
 #include "../../product/media/manifest_rmge01.h"
+#include "../../runtime/compat/heap_smoke.h"
+#include "../../runtime/compat/scalar_math.h"
+#include "../../runtime/video/video_out.h"
+
+/* Log no klog (capturável via GoldHEN:3232). Instrumenta cada passo pra
+   localizar exatamente onde um eventual crash acontece. */
+static void klog(const char *msg) {
+    sceKernelDebugOutText(0, "[quovix] ");
+    sceKernelDebugOutText(0, msg);
+    sceKernelDebugOutText(0, "\n");
+}
 
 /* Notificação on-screen (prova visível de boot).
    OrbisNotificationRequest vem de <orbis/_types/kernel.h> (via libkernel.h). */
@@ -41,25 +52,61 @@ static const char *find_user_media(void) {
 }
 
 int main(void) {
-    /* Gotcha OpenOrbis: sem esconder o splash, o sistema mata o app ("crash"). */
+    klog("boot: main entrou");
+
+    klog("passo 1: hide splash screen...");
     sceSystemServiceHideSplashScreen();
+    klog("passo 1 ok");
 
+    klog("heap: autoteste de tamanho nativo e alinhamento...");
+    if (qvx_heap_smoke_test() != 0) {
+        klog("heap: FALHA no autoteste; inicializacao interrompida");
+        notify("Falha na inicializacao da casca. Consulte o log.");
+        for (;;) sceKernelUsleep(1000 * 1000);
+    }
+    klog("heap: autoteste OK (scalar/array, 64/128 bytes de alinhamento)");
+
+    klog("math: autoteste de conversoes e operacoes escalares...");
+    if (qvx_math_smoke_test() != 0) {
+        klog("math: FALHA no autoteste; inicializacao interrompida");
+        notify("Falha na inicializacao da casca. Consulte o log.");
+        for (;;) sceKernelUsleep(1000 * 1000);
+    }
+    klog("math: autoteste OK (65536 valores u16 e casos de borda)");
+
+    klog("passo 2: notify...");
     notify("quovix — casca v0 iniciada (" QVX_GAME_ID ")");
+    klog("passo 2 ok");
 
+    klog("passo 3: find media...");
     const char *media = find_user_media();
+    klog(media ? "passo 3 ok: media encontrada" : "passo 3 ok: media ausente");
+
     if (!media) {
         notify("Mídia não encontrada. Coloque seu dump RMGE01 (BYO-dump).");
     } else {
+        klog("passo 4: verify media (sha1 de 6MB)...");
         qvx_mv_result r = qvx_mv_verify_maindol(media);
+        klog("passo 4 ok");
         if (r == QVX_MV_OK)
             notify("Mídia verificada: RMGE01 OK. (motor ainda não carregado)");
         else
             notify("Mídia inválida: dump errado ou corrompido.");
     }
 
-    /* Mount do motor = stub por enquanto. Mantém o processo vivo. */
+    klog("passo 5: iniciando video-out (primeiro pixel)...");
+    if (qvx_video_init() != 0) {
+        klog("video: FALHA no init; caindo pro loop sem render");
+        notify("Falha ao abrir video-out. Consulte o log.");
+        for (;;) sceKernelUsleep(1000 * 1000);
+    }
+    klog("passo 5 ok: video-out ativo; present loop");
+
+    /* Mount do motor = stub. Por ora a casca desenha um fundo cósmico próprio;
+       a arte do jogo (lida do dump em runtime) entra aqui depois do blit. */
     for (;;) {
-        sceKernelUsleep(1000 * 1000);
+        qvx_video_clear(0xFF0A1020);   /* azul-petróleo escuro (original) */
+        qvx_video_present();
     }
     return 0;
 }

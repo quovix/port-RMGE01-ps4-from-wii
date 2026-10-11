@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# @orig none — hook original (quovix), Apache-2.0
+exec python3 "$(git rev-parse --show-toplevel)/tools/publication/check.py" --scope all --push-input

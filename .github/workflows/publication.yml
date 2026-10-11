@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# @orig none — workflow original (quovix), Apache-2.0
+name: Conteúdo público próprio
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Testar proteção de publicação
+        run: python3 -m unittest discover -s tools/publication -p 'test_*.py' -v
+      - name: Testar ponte de heap com sanitizers
+        run: |
+          mkdir -p out/host-test
+          clang++ -std=c++98 -Wall -Wextra -Werror -fsanitize=address,undefined -g runtime/compat/heap_new.cpp runtime/compat/heap_smoke.cpp product/host_test/heap_test.cpp -o out/host-test/heap_test
+          out/host-test/heap_test
+      - name: Testar matematica e overlays originais
+        run: |
+          mkdir -p out/host-test
+          clang -std=c11 -O2 -Wall -Wextra -Werror -fno-fast-math -ffp-contract=off -fsanitize=address,undefined,float-cast-overflow -g runtime/compat/scalar_math.c runtime/compat/math_smoke.c product/host_test/math_test.c -lm -o out/host-test/math_test
+          out/host-test/math_test
+          python3 -m unittest discover -s tools/portability -p 'test_*.py' -v
+      - name: Auditar checkout, índice e histórico completo
+        run: python3 tools/publication/check.py

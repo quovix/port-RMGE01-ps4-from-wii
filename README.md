@@ -5,6 +5,10 @@ PlayStation 4, a partir da decompilação da comunidade. Distribui **apenas
 ferramenta e runtime** — nenhum asset, binário ou chave proprietária. Rodar exige
 o **dump do seu próprio disco** (BYO-dump).
 
+O motor derivado do decomp é compilado **localmente pelo usuário**. Source,
+objetos e executáveis que contenham esse código não são artefatos públicos;
+publicamos as ferramentas e alterações próprias necessárias ao porte.
+
 | | |
 |---|---|
 | **Identidade (ASIRN)** | `asi:FR69GJ5CI:orbis:quovix/rmge01:recomp@1.2.0` |
@@ -30,6 +34,9 @@ o **dump do seu próprio disco** (BYO-dump).
 3. **Proveniência obrigatória.** Todo código derivado referencia sua origem no
    binário; código original marca `@orig none`. Ver [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
 4. **Sem marca.** Identificação pelo **game ID**, não pelo nome comercial.
+5. **Publicação só do nosso patch/código.** Source do jogo, objetos derivados e
+   diffs com contexto do decomp ficam locais. Hooks e CI auditam índice e
+   histórico; ver [`docs/02-publicacao-apenas-codigo-proprio.md`](docs/02-publicacao-apenas-codigo-proprio.md).
 
 ## Como funciona
 
@@ -54,6 +61,8 @@ dump RVZ (BYO) ──▶ decomp (Petari, local) ──▶ source de jogo (intact
 - **Fronteira de plataforma:** [`docs/PLATFORM-BOUNDARY.md`](docs/PLATFORM-BOUNDARY.md)
 - **Pipeline técnico:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Produto (casca-primeiro, estilo Dusk):** [`docs/PRODUCT.md`](docs/PRODUCT.md)
+- **Medição de portabilidade:** [`docs/01-medicao-portabilidade.md`](docs/01-medicao-portabilidade.md)
+- **Referência de arquitetura (Dusklight/Aurora/Borealis):** [`docs/04-referencia-dusklight.md`](docs/04-referencia-dusklight.md)
 
 ## Status
 
@@ -62,9 +71,10 @@ dump RVZ (BYO) ──▶ decomp (Petari, local) ──▶ source de jogo (intact
 | Ingest | dump RVZ → `main.dol` verificado (`tools/ingest`) | ✅ scaffold + extração via dtk |
 | Decomp | buildar o Petari (local) | ✅ matching byte-perfect (arm64/Rosetta) |
 | Verificação de mídia | SHA-1 + manifesto RMGE01 (`product/media`) | ✅ validado no host |
-| Fase A | source de jogo compila com clang (host) | ✅ 1 TU limpo (`-fdelayed-template-parsing`); medição ampla pendente |
-| Casca v0 | PKG mínimo que boota no PS4 | 🔨 em andamento (toolchain OpenOrbis) |
-| Backend Orbis | GX→GNM, áudio, input | ⬜ próximo grande bloco |
+| Fase A — medição | 1.604 TUs via compile DB; host e x86-64 | ✅ baseline 141; com heap + matemática + friend privado, 1.335 objetos (83,23%); nenhum include ausente |
+| Compatibilidade C++/ABI | alocadores, headers, asm PPC, extensões CodeWarrior | ⏳ patches de heap/matemática/friend disponíveis; 269 TUs ainda falham |
+| Casca v0 | PKG com autotestes de heap e matemática | ✅ instalado, boot e dois autotestes confirmados no PS4; mídia ausente |
+| Backend Orbis | GX→GNM, áudio, input | ⏳ após camada de compatibilidade |
 
 ## Requisitos
 
@@ -91,8 +101,15 @@ docs/PLATFORM-BOUNDARY  fronteira Wii(RVL)→Orbis, por tiers
 docs/PRODUCT.md         produto casca-primeiro (import/verify/config)
 docs/PROVENANCE.md      regra de proveniência obrigatória
 docs/PHASE-A-SPIKE.md   resultados do spike de portabilidade (clang)
+docs/01-medicao-portabilidade.md  medição ampla e bloqueios verificados
+docs/03-ponte-heap-e-pkg.md  patch de alocação, 852 TUs e casca reconstruída
+docs/05-matematica-escalar-e-overlays.md  adapters próprios, 965 TUs e novo PKG
+docs/07-validacao-de-boot-no-ps4.md  main, autotestes e loop confirmados em hardware
+docs/08-compatibilidade-friend-em-nw4r.md  receita privada, 1.335 TUs em C++98
 tools/ingest/           dump RVZ → main.dol + proveniência
+tools/portability/      harness de compile DB (source e objetos ficam locais)
 product/media/          verificação de mídia (SHA-1 próprio + manifesto)
+runtime/compat/         ponte original de heap + autoteste host/Orbis
 package/                casca v0 do PKG (eboot, build OpenOrbis)
 ```
 

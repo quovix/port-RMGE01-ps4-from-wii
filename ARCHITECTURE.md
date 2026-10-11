@@ -1,7 +1,11 @@
 # Arquitetura do pipeline — `[PORT][RMGE01][PS4<-WII]`
 
-> Documento de **design**. Ainda não há implementação; isto define o alvo e as
-> decisões. Identidade do artefato: `asi:FR69GJ5CI:orbis:quovix/rmge01:recomp@1.2.0`.
+> **Proposta histórica de design** para lift/codegen PPC. O projeto adotou depois
+> o porte do decomp local: a estratégia atual está no [README](README.md) e na
+> [fronteira de plataforma](docs/PLATFORM-BOUNDARY.md). As seções de lift/codegen
+> abaixo são uma alternativa de pesquisa, não um pipeline implementado. A
+> [medição da Fase A](docs/01-medicao-portabilidade.md) descreve o estado verificado.
+> Identidade do artefato: `asi:FR69GJ5CI:orbis:quovix/rmge01:recomp@1.2.0`.
 
 Objetivo: pegar um **dump do próprio disco** (game ID `RMGE01`, Wii, CPU
 PowerPC "Broadway") e produzir um executável **nativo** de PS4 (plataforma

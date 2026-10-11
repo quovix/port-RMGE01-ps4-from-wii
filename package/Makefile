@@ -10,37 +10,50 @@ VERSION     := 1.00
 TITLE_ID    := QVOX00001
 CONTENT_ID  := UP0001-QVOX00001_00-7E0C9848AC532465
 
-LIBS        := -lc -lkernel -lc++ -lSceSystemService
+LIBS        := -lc -lkernel -lc++ -lSceSystemService -lSceVideoOut
 
 # --- fontes (nosso código; o motor entra depois) ----------------------------
-SRC_C       := src/main.c ../product/media/media_verify.c ../product/media/sha1.c
-INCLUDES    := -I../product/media
+SRC_C       := src/main.c ../product/media/media_verify.c ../product/media/sha1.c \
+               ../runtime/compat/scalar_math.c ../runtime/compat/math_smoke.c \
+               ../runtime/video/video_out.c
+SRC_CPP     := ../runtime/compat/heap_new.cpp ../runtime/compat/heap_smoke.cpp
+INCLUDES    := -I../product/media -I../runtime/compat -I../runtime/video
 
 # --- toolchain --------------------------------------------------------------
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 LLVM        ?= /opt/homebrew/opt/llvm@18
 CC          := $(LLVM)/bin/clang
+CXX         := $(LLVM)/bin/clang++
 LD          := $(LLVM)/bin/ld.lld
 CDIR        := macos
 INTDIR      := build
+PKG_STAGING := $(INTDIR)/pkg-staging
 
-OBJS        := $(patsubst %.c,$(INTDIR)/%.o,$(notdir $(SRC_C)))
+OBJS        := $(patsubst %.c,$(INTDIR)/%.o,$(notdir $(SRC_C))) \
+               $(patsubst %.cpp,$(INTDIR)/%.o,$(notdir $(SRC_CPP)))
 
 CFLAGS      := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c \
-               -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include $(INCLUDES)
+               -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include $(INCLUDES) -MMD -MP \
+               -fno-fast-math -ffp-contract=off
+CXXFLAGS    := $(CFLAGS) -std=c++98 -fno-exceptions -fno-rtti
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
                -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
-VPATH       := src:../product/media
+VPATH       := src:../product/media:../runtime/compat:../runtime/video
 
 _unused     := $(shell mkdir -p $(INTDIR))
 
 all: $(CONTENT_ID).pkg
 
 $(CONTENT_ID).pkg: pkg.gp4
-	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
+	@mkdir -p $(PKG_STAGING)
+	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< $(PKG_STAGING)
+	mv $(PKG_STAGING)/$(CONTENT_ID).pkg $@
 
-pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
+# Dependências locais da casca: não incorporar arquivos arbitrários da pasta.
+LIBMODULES := sce_module/libc.prx sce_module/libSceFios2.prx
+
+pkg.gp4: eboot.bin sce_sys/about/right.sprx sce_sys/param.sfo sce_sys/icon0.png $(LIBMODULES)
 	$(TOOLCHAIN)/bin/$(CDIR)/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
 
 sce_sys/param.sfo: Makefile
@@ -57,14 +70,20 @@ sce_sys/param.sfo: Makefile
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core sfo_setentry $@ TITLE_ID --type Utf8 --maxsize 12 --value '$(TITLE_ID)'
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core sfo_setentry $@ VERSION --type Utf8 --maxsize 8 --value '$(VERSION)'
 
-eboot.bin: $(OBJS)
-	$(LD) $(INTDIR)/*.o -o $(INTDIR)/eboot.elf $(LDFLAGS)
+eboot.bin: $(OBJS) Makefile
+	$(LD) $(OBJS) -o $(INTDIR)/eboot.elf $(LDFLAGS)
 	$(TOOLCHAIN)/bin/$(CDIR)/create-fself-macos -in=$(INTDIR)/eboot.elf -out=$(INTDIR)/eboot.oelf --eboot "eboot.bin" --paid 0x3800000000000011
 
-$(INTDIR)/%.o: %.c
+$(INTDIR)/%.o: %.c Makefile
 	$(CC) $(CFLAGS) -o $@ $<
+
+$(INTDIR)/%.o: %.cpp Makefile
+	$(CXX) $(CXXFLAGS) -o $@ $<
+
+-include $(OBJS:.o=.d)
 
 clean:
 	rm -f $(CONTENT_ID).pkg pkg.gp4 sce_sys/param.sfo eboot.bin $(INTDIR)/*.o $(INTDIR)/*.elf $(INTDIR)/*.oelf
 
+.DELETE_ON_ERROR:
 .PHONY: all clean

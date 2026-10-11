@@ -3,8 +3,19 @@
 Estratégia: **casca primeiro, motor atrás.** A gente constrói agora o produto que
 dá boot no PS4 e faz tudo **menos** renderizar o jogo — import, verificação de
 mídia, config, melhorias — e o motor (código de jogo + backend Orbis) preenche o
-buraco conforme a camada de plataforma nasce. É o modelo dos ports de cena limpa
-(o **Dusk**, de Twilight Princess, faz assim).
+buraco conforme a camada de plataforma nasce. A separação entre motor,
+compatibilidade e serviços do aplicativo no
+[Dusklight](https://github.com/TwilitRealm/dusklight) é uma referência de
+arquitetura. A [análise dos arquivos consultados](04-referencia-dusklight.md)
+registra as evidências; ela não comprova que o upstream seguiu esta mesma
+cronologia de casca primeiro.
+
+**Distribuição:** publicamos somente a casca/backend/ferramentas e o patch
+próprios. O source do decomp e qualquer motor/binário que o incorpore são
+gerados localmente pelo usuário e nunca enviados como release público. Isso
+vale também para PKGs futuros com o motor linkado; a ausência de assets não
+torna publicável um pacote que contenha código do jogo. Ver a
+[política de publicação](02-publicacao-apenas-codigo-proprio.md).
 
 ## Por que casca-primeiro
 - Dá **marco em hardware real cedo** (PKG que boota no teu PS4 com ps4debug).
@@ -25,16 +36,20 @@ buraco conforme a camada de plataforma nasce. É o modelo dos ports de cena limp
               [ motor do jogo + backend Orbis ]     ← preenche depois (fases B–D)
 ```
 
-## 1. Import + verificação de mídia (o "faz isso também" do Dusk)
-No primeiro run o app:
+## 1. Import + verificação de mídia
+Fluxo alvo para o primeiro run:
 1. **Acha** os dados do jogo do usuário (USB/HDD do PS4, ou push via rede).
 2. **Verifica a mídia**: game ID == `RMGE01`, região NTSC-U, e **hashes
    conhecidos** batem (ex. `sys/main.dol` sha1 `9a71008a…`, amarrado ao nosso
-   ingest e ao content ID da ASIRN). Mídia errada/corrompida → recusa, igual Dusk.
+   ingest e ao content ID da ASIRN). Mídia errada/corrompida → recusa.
 3. **Importa** pra storage local do PS4 os assets necessários. Nada vem no PKG.
 
-Isso é o enforcement do BYO-dump em runtime. Manifesto esperado em
-`product/media/manifest_rmge01.json`; lógica em `product/media/`.
+Hoje a casca acha `sys/main.dol` e verifica seu SHA-1 contra
+`product/media/manifest_rmge01.h`. A importação, a leitura do game ID do disco e
+a integridade dos demais assets ainda não estão integradas. Verificar o DOL
+não atesta a integridade da imagem inteira. O
+[catálogo de mídia do Dusklight](https://github.com/TwilitRealm/dusklight/blob/main/src/dusk/iso_validate.cpp)
+é uma referência para evoluir essa camada com estados e erros explícitos.
 
 ## 2. Config + melhorias
 Store de settings + menu (scaffolding agora, preenche com o motor):

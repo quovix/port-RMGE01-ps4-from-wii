@@ -20,6 +20,11 @@
 nw4r / libc) com um **backend Orbis**, deixando `src/Game/*` e `JSystem`
 inalterados. O jogo não sabe que mudou de hardware — só o backend muda.
 
+Referência permanente indicada pelo usuário: [Dusklight/Aurora/Borealis](04-referencia-dusklight.md).
+Consultar os contratos por subsistema antes de implementar. Seu uso de
+WebGPU/Dawn não demonstra um renderer Orbis pronto; a adaptação é um marco
+próprio. Manter source do jogo intacto continua sendo um objetivo a validar.
+
 ## RVL_SDK — 36 subsistemas, por tier
 
 ### Tier 1 — boot + render (obrigatório, difícil)
@@ -73,15 +78,20 @@ nossos serviços nativos), `rso` (módulos dinâmicos), `sc` (system config), `d
 trabalho é reimplementar os tiers 1–2 do RVL_SDK como backend Orbis; o tier 4 é
 stub; `src/Game` não se toca.
 
-## Fase A — spike de portabilidade (próximo passo concreto)
+## Fase A — portabilidade medida
 Antes de escrever qualquer backend: **o source do jogo compila com clang pra
 x86-64?** O decomp é escrito pra CodeWarrior/PPC (pragmas, big-endian, headers
 Metrowerks). A fase A compila um subconjunto com clang no host e cataloga a
 parede de portabilidade (pragmas CW, assunções big-endian, intrínsecos PPC,
 headers MSL). Isso dimensiona o trabalho real **antes** de investir no backend.
 
-Alvo de teste de hardware: **PS4 com ps4debug** (deploy de payload via rede) —
-entra só na fase D.
+A [medição de 11/10/2026](01-medicao-portabilidade.md) cobre 1.604 TUs do compile
+DB: 141 passam e geram objetos x86-64. Os demais exigem compatibilidade de
+headers/linguagem/ABI antes do backend. Manter `src/Game` intacto é um objetivo;
+a viabilidade completa ainda não foi demonstrada.
+
+Alvo de teste de hardware: **PS4 com ps4debug**. A casca permite testar boot cedo;
+os objetos da Fase A ainda não constituem um motor linkado nem executável.
 
 ## Cena limpa
 - Este doc e o backend Orbis são **código/análise originais** (público, Apache-2.0).

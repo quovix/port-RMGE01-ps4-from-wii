@@ -1,8 +1,10 @@
 # Regra de proveniência (obrigatória)
 
-> **Todo código derivado do jogo deve referenciar sua origem no binário
-> original.** Sem referência de origem, o código não entra no projeto — o build/CI
-> rejeita. Esta regra vale para todos os artefatos de recompilação da `quovix`.
+> **Publicamos somente o código próprio do porte.** Código de jogo ou derivado,
+> mesmo anotado, nunca entra no Git público. A referência de origem é obrigatória
+> para os artefatos derivados **locais**; não é autorização para redistribuí-los.
+> A [política de publicação](02-publicacao-apenas-codigo-proprio.md) e seu checker
+> prevalecem sobre os exemplos históricos de codegen abaixo.
 
 ## Por quê
 
@@ -57,12 +59,14 @@ binário.
 
 ## Enforcement (CI)
 
-- Todo arquivo em diretórios de **código gerado** (saída de `tools/codegen/`, e
-  wrappers em `runtime/*` que implementam uma função específica do jogo) **deve**
-  ter cabeçalho `@orig`/`@gen` e entrada correspondente em `provenance.jsonl`.
-- Todo arquivo de **código original** (`runtime/` genérico, `tools/`, `package/`)
-  deve ter `@orig none`.
-- Falha de qualquer um → build falha. (Check a implementar junto com o codegen.)
+O checker implementado em `tools/publication/check.py` exige `@orig none` no
+código público, rejeita conteúdo derivado e audita também índice e histórico.
+Hooks locais e CI executam essa proteção. O `.gitignore` é uma primeira barreira;
+o checker detecta inclusive arquivos proibidos adicionados à força.
+
+Codegen, wrappers derivados e `provenance.jsonl` permanecem no build privado,
+fora do Git. Sua verificação de proveniência local ainda é uma etapa futura,
+se o caminho de codegen for retomado; não se confunde com publicar seu conteúdo.
 
 ## Fronteira que isso protege
 
