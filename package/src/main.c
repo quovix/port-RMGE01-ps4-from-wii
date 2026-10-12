@@ -139,6 +139,19 @@ int main(void) {
         qvx_log_render(20, 52, 0xFF80FF80, 2);     /* log on-screen (verde) */
         qvx_video_present();
     }
+
+#ifdef QVX_ENGINE_JUMP
+    /* Salto controlado para o main do jogo (GameSystem, renomeado via entry_shim).
+       O símbolo é C++ mangled; chamamos pelo asm label a partir deste .c.
+       Toda a superfície de plataforma ainda não implementada está ligada a stubs
+       weak instrumentados (qvx_stub_hit -> klog), então o rastro de chamadas até
+       o primeiro fault fica capturável. Primeira iteração do loop crash-driven. */
+    extern void qvx_game_entry(void) __asm__("_Z14qvx_game_entryv");
+    klog("engine-jump: saltando para qvx_game_entry (GameSystem main)...");
+    qvx_game_entry();
+    klog("engine-jump: qvx_game_entry RETORNOU (inesperado nesta fase)");
+#endif
+
     for (;;) {
         qvx_video_present();                        /* flip entre buffers idênticos */
     }
