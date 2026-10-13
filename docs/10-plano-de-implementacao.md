@@ -182,3 +182,40 @@ Cada marco: objetivo, subsistemas, tamanho honesto, critério de pronto.
 - Cascata de stubs em M2 pode trazer dependências fundas não previstas (threading
   de JKR, decomp Yaz0/SZS, ARAM assíncrono).
 - Dependência de dados: sem o dump montado corretamente, M3 em diante não anda.
+
+## M3.5 — Camada de dados do Wii (endianness + largura de campo) [NOVO, decidido 13/10]
+
+Descoberta ao fazer a `ErrorMessageArchive` montar: o motor lê structs de dado do
+jogo (RARC e todo formato) que são **big-endian** e com campos de **4 bytes**,
+mas no nosso LP64 `u32 = unsigned long` (8 bytes). Resultado: `RarcHeader::mHeaderSize`
+lê do offset errado (16 em vez de 8) e byte-swapped -> `0x60910000` em vez de `0x20`
+-> `open()` crasha. Afeta TODA leitura de dado externo do jogo (archives, modelos,
+texturas, layouts, mensagens). Não aparecia antes porque structs de RUNTIME (heaps)
+são consistentes em 8-byte u32; só dado EXTERNO (4-byte BE) quebra.
+
+**Estratégia escolhida: (B) adaptar a leitura no load, via tipos `be32`/`be16`**
+nas structs on-disk (realização limpa: resolve largura E endianness sem reconstruir
+dado). Por formato/struct, através de overlay LOCAL dos headers:
+- `be32`/`be16`: tipo de 4/2 bytes com `operator u32/u16` que faz byte-swap na
+  leitura (código nosso). Mantém `u32` runtime como está.
+- Trocar os campos das structs on-disk (RarcHeader, RarcInfoBlock, SDIDirEntry,
+  SDIFileEntry, ...) de `u32`/`u16` para `be32`/`be16`.
+- **Intricações a tratar** (não é só trocar o tipo):
+  - Bit-fields (`SDIFileEntry::mFlag:8`, `mNameOffset:24`) — bit-field sobre be32
+    precisa de accessor manual (ler o word BE e mascarar).
+  - Ponteiro embutido (`SDIFileEntry::mFileData` em 0x10) — 4 bytes na Wii, 8 no
+    LP64: o **stride do array de entries descasa**. Precisa separar a parte on-disk
+    (0x14 bytes, estilo Wii) do slot de runtime, ou iterar com stride on-disk.
+  - Recompilar os objetos que leem essas structs (JKRMemArchive etc.) com os
+    headers novos.
+- Validação do 1º incremento: `ErrorMessageArchive` monta (MF3/AH2+ passam) e o
+  `GameSystemObjHolder::init` avança.
+
+**Escopo honesto:** é um SEGUNDO subsistema grande, do porte do GX (M4). "Ver o
+jogo na tela" depende de M3.5 (dados) + M4 (gráficos), ambos ainda por fazer.
+A fase de matar crashes de boot (10+ correções) era a parte mais tratável.
+
+Progresso de dados até aqui: blob `cErrorArchive` extraído do `main.dol` do dump
+(39616 bytes, RARC válido) e ligado via `.incbin` local (símbolo aponta pro dado
+real em 0xa27200) — prova o caminho BYO-dump pros blobs embutidos do .dol. Falta
+a leitura da struct (M3.5).
