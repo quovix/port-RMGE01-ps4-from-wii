@@ -21,8 +21,13 @@ extern "C" {
 /* Guardas para conviver com headers do SDK no mesmo TU, caso ocorra. */
 #ifndef QVX_DVD_RVL_TYPES
 #define QVX_DVD_RVL_TYPES
-typedef int32_t  s32;
-typedef uint32_t u32;
+/* ABI RVL em LP64: no engine (revolution/types.h) s32/u32 são `long`/`unsigned
+   long` = 8 bytes neste alvo x86_64. Usar int32_t/uint32_t aqui (4 bytes)
+   desalinhava TODAS as structs (DVDFileInfo.length, DVDDirEntry.name) e fazia
+   retorno -1 virar +4294967295 no lado do engine ("não achado" = sucesso).
+   Casar a largura é obrigatório. Verificado em Petari/.../revolution/types.h. */
+typedef long          s32;
+typedef unsigned long u32;
 typedef uint8_t  u8;
 typedef int      BOOL;
 #ifndef TRUE
@@ -123,6 +128,15 @@ u32  qvx_dvd_entry_count(void);
 /* 1 se a tabela de entries foi construída a partir do FST real do disco;
    0 se veio do fallback caminhando a árvore files/. Para diagnóstico/teste. */
 int  qvx_dvd_from_fst(void);
+
+/* Trava a ABI contra regressão de largura: estes offsets/tamanhos têm que bater
+   com revolution/dvd.h do engine em LP64 (s32/u32 = 8 bytes). */
+#include <stddef.h>
+_Static_assert(sizeof(DVDCommandBlock) == 96, "DVDCommandBlock ABI");
+_Static_assert(sizeof(DVDFileInfo) == 120, "DVDFileInfo ABI");
+_Static_assert(offsetof(DVDFileInfo, length) == 104, "DVDFileInfo.length ABI");
+_Static_assert(sizeof(DVDDirEntry) == 24, "DVDDirEntry ABI");
+_Static_assert(offsetof(DVDDirEntry, name) == 16, "DVDDirEntry.name ABI");
 
 #ifdef __cplusplus
 }

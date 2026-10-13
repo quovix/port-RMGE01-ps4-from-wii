@@ -21,6 +21,33 @@ static void* native_allocate(qvx_alloc_size bytes, JKRHeap* owner, int alignment
 
 static void native_release(void* memory, JKRHeap*, int) { free(memory); }
 
+/* --- Alocador PERSISTENTE pro run real do jogo -------------------------------
+   Diferente do native_allocate do smoke test (que recusa owner!=NULL e
+   alinhamento<0 DE PROPÓSITO, pra não mascarar heap do jogo em teste de host),
+   este é permissivo: trata owner como opaco (JKRHeap é stub -> ignora) e aceita
+   alinhamento negativo (convenção JKR = alocar do fim do heap) pelo módulo.
+   Sem ele vinculado, o 1º `new (pHeap, align)` do motor (FileRipper::setup)
+   cai em abort() -> SIGABRT ~5s no boot. @orig none. */
+static void* game_allocate(qvx_alloc_size bytes, JKRHeap* /*owner*/, int alignment) {
+    int a = alignment < 0 ? -alignment : alignment;   /* JKR: <0 = do fim */
+    if (a == 0) return malloc(bytes ? bytes : 1);
+    qvx_alloc_size align = static_cast<qvx_alloc_size>(a);
+    if ((align & (align - 1)) != 0) {                 /* não pot. de 2: arredonda */
+        qvx_alloc_size p = 1; while (p < align) p <<= 1; align = p;
+    }
+    if (align < sizeof(void*)) align = sizeof(void*);
+    void* memory = 0;
+    return posix_memalign(&memory, align, bytes ? bytes : 1) == 0 ? memory : 0;
+}
+static void game_release(void* memory, JKRHeap*, int) { free(memory); }
+
+/* Vincula o alocador do jogo de forma PERSISTENTE (não desliga depois). Chamar
+   no main ANTES dos ctors do motor e do qvx_game_entry. C-callable. */
+extern "C" int qvx_heap_bind_game(void) {
+    static const qvx_heap_allocator allocator = {game_allocate, game_release};
+    return qvx_heap_bind(&allocator);
+}
+
 int qvx_heap_smoke_test(void) {
     typedef char native_width[(sizeof(qvx_alloc_size) == sizeof(void*)) ? 1 : -1];
     (void)sizeof(native_width);

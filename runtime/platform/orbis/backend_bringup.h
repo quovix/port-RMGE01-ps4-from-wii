@@ -11,4 +11,10 @@
    ou o número de checagens que falharam. */
 int qvx_backend_bringup(void);
 
+/* Tick de boot: loga (tela + klog) e APRESENTA um frame. Definido em main.c
+   (tem acesso ao framebuffer/splash). Usado aqui pra que cada sub-passo do
+   bring-up fique visível — a última linha na tela localiza o fault, já que
+   klog/beacon/sigaction não são confiáveis no Orbis. */
+void qvx_boot_tick(const char *msg);
+
 #endif

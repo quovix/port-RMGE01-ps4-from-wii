@@ -151,8 +151,26 @@ static s32 resolve_path(const char *path) {
     return (s32)cur;
 }
 
+/* --- Trilha DVD lida AO VIVO via ps4debug ------------------------------------
+   Com BYO-dump incompleto, o jogo pede um archive que nao existe, recebe -1 e
+   deref-a nulo -> crash. Gravamos o ULTIMO path pedido + o resultado numa global
+   em .data; o poller le isso quando o processo morre e diz EXATAMENTE qual
+   arquivo faltou (= o que o usuario precisa extrair). @orig none. */
+volatile char g_qvx_lastdvd[256] = "(nenhum)";
+volatile int  g_qvx_lastdvd_ent = -2;        /* -2 = nunca chamado, -1 = nao achado */
+volatile unsigned g_qvx_dvd_calls = 0;
+
 s32 DVDConvertPathToEntrynum(const char *pathPtr) {
-    return resolve_path(pathPtr);
+    g_qvx_dvd_calls++;
+    if (pathPtr) {
+        unsigned i = 0;
+        for (; i < sizeof(g_qvx_lastdvd) - 1 && pathPtr[i]; i++)
+            g_qvx_lastdvd[i] = pathPtr[i];
+        g_qvx_lastdvd[i] = 0;
+    }
+    s32 e = resolve_path(pathPtr);
+    g_qvx_lastdvd_ent = (int)e;
+    return e;
 }
 
 /* ---------------------------------------------------------------------------

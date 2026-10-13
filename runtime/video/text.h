@@ -14,4 +14,10 @@ void qvx_text_draw(int x, int y, const char *s, uint32_t color, int scale);
 void qvx_log_line(const char *s);
 void qvx_log_render(int x, int y, uint32_t color, int scale);
 
+/* Canal de fase lido AO VIVO via ps4debug (g_qvx_phase, definido no main.c).
+   Declarado aqui pra OSPanic/OSHalt (os.c) poderem gravar o motivo do halt no
+   único canal que o poller lê — o os_halt_loop não encerra o processo, então o
+   panic fica legível. @orig none. */
+void qvx_set_phase(const char *s);
+
 #endif

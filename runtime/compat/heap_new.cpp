@@ -25,6 +25,15 @@ void qvx_heap_release(void* memory, JKRHeap* owner, int alignment) {
     backend.release(memory, owner, alignment);
 }
 
+/* operator new/delete PLANOS: sem estes, `new X()` do decomp caía no operator
+   new do libc++ (malloc), fora do heap do jogo. Roteamos pro nosso allocate()
+   (game_allocate), que é o comportamento esperado do SMG (alocar do heap atual)
+   e memória conhecida-boa. (diagnóstico 2026-10-13: new GameSystem() antes disto). */
+void* operator new(qvx_alloc_size bytes) { return allocate(bytes, 0, 0); }
+void* operator new[](qvx_alloc_size bytes) { return allocate(bytes, 0, 0); }
+void operator delete(void* memory) throw() { qvx_heap_release(memory, 0, 0); }
+void operator delete[](void* memory) throw() { qvx_heap_release(memory, 0, 0); }
+
 void* operator new(qvx_alloc_size bytes, int alignment) { return allocate(bytes, 0, alignment); }
 void* operator new(qvx_alloc_size bytes, JKRHeap* owner) { return allocate(bytes, owner, 0); }
 void* operator new(qvx_alloc_size bytes, JKRHeap* owner, int alignment) { return allocate(bytes, owner, alignment); }

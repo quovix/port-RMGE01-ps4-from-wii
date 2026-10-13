@@ -6,7 +6,7 @@
 
 # --- metadata do pacote (derivado da ASIRN) ---------------------------------
 TITLE       := quovix RMGE01 (BYO-dump)
-VERSION     := 1.00
+VERSION     := 1.01
 TITLE_ID    := QVOX00001
 CONTENT_ID  := UP0001-QVOX00001_00-7E0C9848AC532465
 

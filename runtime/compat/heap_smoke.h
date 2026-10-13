@@ -9,6 +9,12 @@ extern "C" {
    Usa apenas heap nativo com owner NULL, deixa a ponte desligada ao terminar.
    0 = sucesso; negativo = falha na verificação (allocation falha aborta). */
 int qvx_heap_smoke_test(void);
+
+/* Vincula o alocador permissivo PERSISTENTE pro run do jogo (malloc/posix_memalign,
+   owner opaco, aceita alinhamento negativo = JKR "do fim"). Chamar no startup,
+   depois do smoke test e ANTES dos ctors do motor / qvx_game_entry.
+   0 = sucesso; -1 = callbacks incompletos. */
+int qvx_heap_bind_game(void);
 #ifdef __cplusplus
 }
 #endif

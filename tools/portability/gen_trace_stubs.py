@@ -39,9 +39,20 @@ def _valid(sym: str) -> bool:
 _DATA_PREFIXES = ("_ZTV", "_ZTI", "_ZTS", "_ZTC", "_ZTT")
 _DATA_FILL = 256   # 32 ponteiros zerados: cobre vtables de init sem estourar
 
+# Símbolos de DADOS que não casam pelos prefixos _ZT* acima: globais C do motor
+# (ponteiro de display-list da GX, locale) e membros estáticos de classe
+# (_ZN...E<nome>E sem assinatura de função). Instrumentar como função faria o
+# motor ler bytes de código como dado -> fault mascarado. Emitimos objeto zerado.
+_DATA_EXACT = frozenset({
+    "__GDCurrentDL",                     # ponteiro da display-list corrente (GX)
+    "_current_locale",                   # locale corrente (libc++/ctype)
+    "_ZN10J3DMtxCalc10mMtxBufferE",      # J3DMtxCalc::mMtxBuffer (estático)
+    "_ZN10J3DMtxCalc6mJointE",           # J3DMtxCalc::mJoint (estático)
+})
+
 
 def _is_data(sym: str) -> bool:
-    return sym.startswith(_DATA_PREFIXES)
+    return sym.startswith(_DATA_PREFIXES) or sym in _DATA_EXACT
 
 
 def generate(symbols):

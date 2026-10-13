@@ -26,6 +26,7 @@
    pthread_mutex_t/pthread_cond_t, então o mesmo tipo serve nos dois backends. */
 #if QVX_OS_BACKEND_ORBIS
 #  include <orbis/libkernel.h>
+#  include <sys/mman.h>           /* mmap MAP_FIXED p/ os globais em 0x80000000 */
 #  include "../../video/text.h"   /* qvx_log_line — só existe no build do alvo */
    typedef OrbisPthread       qos_thread_t;
    typedef OrbisPthreadMutex  qos_mutex_t;
@@ -186,10 +187,52 @@ static int qos_thread_equal(qos_thread_t a, qos_thread_t b) {
 static qos_mutex_t  g_os_lock;
 static int          g_os_ready = 0;
 
+/* --- globais de baixa memória do Wii em OS_BASE_CACHED (0x80000000) ----------
+   O engine (JKRHeap::initArena, OSPlayTime, etc.) lê a struct OSBootInfo e os
+   globais do SO via a MACRO OSPhysicalToCached(p) = (void*)(p + 0x80000000),
+   com o mapa de memória do Wii embutido em TODOS os objetos já compilados. No
+   Orbis esse endereço não existe, então `code->memorySize` (initArena) derefa
+   0x80000000 e dá SIGSEGV. Mapeamos uma página real e fixa nesse endereço — não
+   é a arena (essa é separada), só serve os globais que o SDK lê. Zerado basta:
+   o único consumidor no caminho de boot (mMemorySize) é write-only no jogo; se
+   um global não-nulo for exigido depois, populamos sob demanda. */
+#define QVX_OS_LOWMEM_BASE 0x80000000UL
+#define QVX_OS_LOWMEM_SIZE 0x4000u   /* 16 KB: cobre os globais do SO até ~0x3128 */
+/* Bases FIXAS < 4GB das arenas (ver nota no bloco da arena). Definidas aqui
+   porque qvx_os_init (abaixo) as atribui aos want_base. */
+#define QVX_MEM1_BASE 0x81000000UL   /* 24 MB -> 0x82800000 */
+#define QVX_MEM2_BASE 0x90000000UL   /* 64 MB -> 0x94000000 */
+#ifndef MAP_ANON
+#  ifdef MAP_ANONYMOUS
+#    define MAP_ANON MAP_ANONYMOUS
+#  endif
+#endif
+static int g_lowmem_ready = 0;
+static void qvx_os_lowmem_init(void) {
+    if (g_lowmem_ready) return;
+    g_lowmem_ready = 1;   /* marca antes: evita reentrância se mmap logar via os_* */
+#if QVX_OS_BACKEND_ORBIS
+    void *want = (void *)QVX_OS_LOWMEM_BASE;
+    void *got = mmap(want, QVX_OS_LOWMEM_SIZE, PROT_READ | PROT_WRITE,
+                     MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
+    char dbg[96];
+    snprintf(dbg, sizeof dbg, "[quovix] lowmem mmap(0x80000000)=%p want=%p\n",
+             got, want);
+    sceKernelDebugOutText(0, dbg);
+    if (got == MAP_FAILED || got != want) {
+        qvx_set_phase("lowmem: FALHA ao mapear 0x80000000");
+        return;
+    }
+    memset(want, 0, QVX_OS_LOWMEM_SIZE);
+    qvx_set_phase("lowmem: 0x80000000 mapeado (globais do SO)");
+#endif
+}
+
 void qvx_os_init(void) {
     if (g_os_ready) return;
     qos_mutex_init(&g_os_lock, 1 /*recursive*/);
     g_os_ready = 1;
+    qvx_os_lowmem_init();
 }
 static void os_ensure(void) { if (!g_os_ready) qvx_os_init(); }
 static void os_lock(void)   { os_ensure(); qos_mutex_lock(&g_os_lock); }
@@ -218,6 +261,15 @@ void OSVReport(const char *msg, va_list ap) {
     char buf[1024];
     int n = vsnprintf(buf, sizeof buf - 1, msg ? msg : "(null)", ap);
     if (n < 0) n = 0;
+#if QVX_OS_BACKEND_ORBIS
+    /* o jogo narra o boot via OSReport; roteia o ULTIMO report pro g_qvx_phase
+       (canal lido ao vivo), pra localizar onde ele para dentro do qvx_game_entry
+       mesmo sem o handler de sinal (que o Orbis não entrega ao userland). */
+    { char ph[96]; int i = 0;
+      ph[i++]='O';ph[i++]='S';ph[i++]='R';ph[i++]=':';
+      for (int j = 0; j < n && i < 95 && buf[j] && buf[j] != '\n'; j++) ph[i++] = buf[j];
+      ph[i] = 0; qvx_set_phase(ph); }
+#endif
     os_emit_line(buf, sizeof buf, (size_t)n);
 }
 
@@ -239,6 +291,11 @@ void OSPanic(const char *file, int line, const char *msg, ...) {
     va_end(ap);
     if (n < 0) n = 0;
     os_emit_line(body, sizeof body, (size_t)n);
+#if QVX_OS_BACKEND_ORBIS
+    /* grava no canal lido ao vivo (o halt_loop não encerra o processo) */
+    { char ph[96]; snprintf(ph, sizeof ph, "PANIC %s:%d %s", file ? file : "?", line, body);
+      qvx_set_phase(ph); }
+#endif
     os_halt_loop();
 }
 
@@ -246,6 +303,9 @@ void OSHalt(const char *msg) {
     char buf[256];
     snprintf(buf, sizeof buf, "OSHalt: %s", msg ? msg : "");
     os_emit(buf); os_emit("\n");
+#if QVX_OS_BACKEND_ORBIS
+    { char ph[96]; snprintf(ph, sizeof ph, "HALT %s", msg ? msg : ""); qvx_set_phase(ph); }
+#endif
     os_halt_loop();
 }
 
@@ -350,8 +410,18 @@ void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime *td) {
 #  define QVX_OS_MEM1_DEFAULT  (24u * 1024u * 1024u)  /* 24 MB (MEM1) */
 #endif
 
-typedef struct { char *lo, *hi, *base; size_t size; int from_malloc; } os_arena;
+typedef struct { char *lo, *hi, *base; size_t size; int from_malloc; unsigned long want_base; } os_arena;
 static os_arena g_mem2, g_mem1;
+
+/* Endereços FIXOS abaixo de 4GB para as arenas (mapa de memória estilo Wii).
+   O engine faz masking de 32 bits em ponteiros (ex.: JKRHeap::initArena usa o
+   LITERAL 0xFFFFFFE0, não a macro OSRoundDown32B), embutido em 1468 objetos.
+   Uma arena acima de 4GB (o malloc dava 0x201000000) é TRUNCADA por essa máscara
+   -> ponteiro inválido -> SIGSEGV no createRoot. Mantendo MEM1/MEM2 < 4GB o
+   masking fica lossless. Não colide com os globais (0x80000000) nem com o eboot
+   (0x400000-0xd20000). (diagnóstico 2026-10-13, emulador).
+   As macros QVX_MEM1_BASE/QVX_MEM2_BASE estão definidas lá em cima (antes de
+   qvx_os_init, que as atribui a want_base). */
 
 void qvx_os_arena_configure(void *base, size_t size) {
     os_lock();
@@ -363,6 +433,25 @@ void qvx_os_arena_configure(void *base, size_t size) {
 
 static void arena_ensure(os_arena *a, size_t def) {
     if (a->base) return;
+    if (!a->want_base)   /* bases fixas < 4GB: masking de 32b do engine fica lossless */
+        a->want_base = (a == &g_mem1) ? QVX_MEM1_BASE : (a == &g_mem2) ? QVX_MEM2_BASE : 0;
+#if QVX_OS_BACKEND_ORBIS
+    if (a->want_base) {
+        void *want = (void *)a->want_base;
+        void *got = mmap(want, def, PROT_READ | PROT_WRITE,
+                         MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
+        char dbg[96];
+        snprintf(dbg, sizeof dbg, "[quovix] arena mmap(%p,%zuMB)=%p\n",
+                 want, def >> 20, got);
+        sceKernelDebugOutText(0, dbg);
+        if (got != MAP_FAILED && got == want) {
+            a->base = (char *)want; a->from_malloc = 0;
+            a->size = def; a->lo = a->base; a->hi = a->base + def;
+            return;
+        }
+        /* fallback: malloc (pode truncar no masking, mas não deixa a arena nula) */
+    }
+#endif
     a->base = (char *)malloc(def);
     a->size = a->base ? def : 0;
     a->lo = a->base; a->hi = a->base + a->size;
