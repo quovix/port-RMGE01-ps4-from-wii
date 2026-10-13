@@ -7,6 +7,49 @@
 #include "heap_smoke.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#ifndef MAP_ANON
+#  ifdef MAP_ANONYMOUS
+#    define MAP_ANON MAP_ANONYMOUS
+#  endif
+#endif
+
+/* --- Pool de BAIXO ENDEREÇO (< 4GB) para objetos do motor --------------------
+   O motor faz masking de 32-bit em ponteiros (this de JKRArchive, arenas, etc.);
+   objeto acima de 4GB (malloc dava 0x201...) é truncado -> deref de lixo -> crash.
+   Servimos TODO operator new de um mmap fixo < 4GB com bump-alloc: endereços
+   baixos (masking lossless) e muito espaço (sem o overflow dos game heaps finitos).
+   Bump sem free individual: suficiente pro boot; free vira reuso só no topo.
+   (diagnóstico emulador 2026-10-13: ArchiveHolder/JKRMemArchive em 0x201...). */
+#define QVX_LOWPOOL_BASE 0xA0000000UL              /* > MEM2(0x94000000), < 4GB */
+#define QVX_LOWPOOL_SIZE 0x10000000UL              /* 256 MB -> termina 0xB0000000.
+   PS4/shadPS4 tem ~367MB de flexible memory livre; 1.25GB nao cabia (Out of
+   flexible memory). Os objetos de operator-new iriam pros game heaps de 88MB no
+   HW real, entao 256MB cobre o boot com folga. (diagnostico emulador 2026-10-13) */
+static char*  g_lp_base = 0;
+static size_t g_lp_off  = 0;
+static int    g_lp_fail = 0;
+static int lowpool_init(void) {
+    if (g_lp_base) return 1;
+    if (g_lp_fail) return 0;
+    void* want = (void*)QVX_LOWPOOL_BASE;
+    void* got = mmap(want, QVX_LOWPOOL_SIZE, PROT_READ | PROT_WRITE,
+                     MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (got == MAP_FAILED || got != want) { g_lp_fail = 1; return 0; }
+    g_lp_base = (char*)want; g_lp_off = 0;
+    return 1;
+}
+static void* lowpool_alloc(qvx_alloc_size bytes, qvx_alloc_size align) {
+    if (!lowpool_init()) return 0;
+    if (align < sizeof(void*)) align = sizeof(void*);
+    size_t off = (g_lp_off + (align - 1)) & ~(size_t)(align - 1);
+    if (off + bytes > QVX_LOWPOOL_SIZE) return 0;   /* esgotou: cai no fallback */
+    g_lp_off = off + (bytes ? bytes : 1);
+    return g_lp_base + off;
+}
+static int lowpool_owns(void* p) {
+    return g_lp_base && (char*)p >= g_lp_base && (char*)p < g_lp_base + QVX_LOWPOOL_SIZE;
+}
 
 static void* native_allocate(qvx_alloc_size bytes, JKRHeap* owner, int alignment) {
     /* Não tratar um heap do jogo como malloc silenciosamente. */
@@ -30,16 +73,23 @@ static void native_release(void* memory, JKRHeap*, int) { free(memory); }
    cai em abort() -> SIGABRT ~5s no boot. @orig none. */
 static void* game_allocate(qvx_alloc_size bytes, JKRHeap* /*owner*/, int alignment) {
     int a = alignment < 0 ? -alignment : alignment;   /* JKR: <0 = do fim */
-    if (a == 0) return malloc(bytes ? bytes : 1);
-    qvx_alloc_size align = static_cast<qvx_alloc_size>(a);
+    qvx_alloc_size align = a ? static_cast<qvx_alloc_size>(a) : sizeof(void*);
     if ((align & (align - 1)) != 0) {                 /* não pot. de 2: arredonda */
         qvx_alloc_size p = 1; while (p < align) p <<= 1; align = p;
     }
-    if (align < sizeof(void*)) align = sizeof(void*);
+    /* pool de baixo endereço primeiro (endereços < 4GB p/ o masking do motor) */
+    void* m = lowpool_alloc(bytes, align);
+    if (m != 0) return m;
+    /* pool esgotou ou não mapeou: fallback malloc (raro; pode cair alto) */
+    if (a == 0) return malloc(bytes ? bytes : 1);
     void* memory = 0;
     return posix_memalign(&memory, align, bytes ? bytes : 1) == 0 ? memory : 0;
 }
-static void game_release(void* memory, JKRHeap*, int) { free(memory); }
+static void game_release(void* memory, JKRHeap*, int) {
+    /* alocações do pool são bump-only (sem free individual); só libera o fallback. */
+    if (lowpool_owns(memory)) return;
+    free(memory);
+}
 
 /* Vincula o alocador do jogo de forma PERSISTENTE (não desliga depois). Chamar
    no main ANTES dos ctors do motor e do qvx_game_entry. C-callable. */
