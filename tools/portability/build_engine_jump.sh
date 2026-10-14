@@ -64,6 +64,7 @@ SRC_C=(
   "$REPO/runtime/platform/orbis/os.c" "$REPO/runtime/platform/orbis/dvd.c"
   "$REPO/runtime/platform/orbis/backend_bringup.c"
   "$REPO/runtime/platform/orbis/stub_trace.c"
+  "$REPO/runtime/compat/qvx_rarc_conv.c"
 )
 SRC_CPP=( "$REPO/runtime/compat/heap_new.cpp" "$REPO/runtime/compat/heap_smoke.cpp" )
 

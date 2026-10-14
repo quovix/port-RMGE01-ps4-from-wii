@@ -51,6 +51,14 @@ static int lowpool_owns(void* p) {
     return g_lp_base && (char*)p >= g_lp_base && (char*)p < g_lp_base + QVX_LOWPOOL_SIZE;
 }
 
+/* Exposto p/ C: alocar do pool baixo (< 4GB). Usado pelo conversor de dados RARC
+   (qvx_rarc_conv.c), cujo buffer convertido precisa ser < 4GB (ponteiros/masking). */
+extern "C" void* qvx_pool_alloc(unsigned long bytes, unsigned long align) {
+    if (align < sizeof(void*)) align = sizeof(void*);
+    void* m = lowpool_alloc((qvx_alloc_size)bytes, (qvx_alloc_size)align);
+    return m; /* NULL se o pool esgotar: o chamador trata (não converte) */
+}
+
 static void* native_allocate(qvx_alloc_size bytes, JKRHeap* owner, int alignment) {
     /* Não tratar um heap do jogo como malloc silenciosamente. */
     if (owner || alignment < 0) return 0;

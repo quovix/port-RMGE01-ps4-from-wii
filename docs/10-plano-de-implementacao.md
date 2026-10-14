@@ -219,3 +219,39 @@ Progresso de dados até aqui: blob `cErrorArchive` extraído do `main.dol` do du
 (39616 bytes, RARC válido) e ligado via `.incbin` local (símbolo aponta pro dado
 real em 0xa27200) — prova o caminho BYO-dump pros blobs embutidos do .dol. Falta
 a leitura da struct (M3.5).
+
+## M3.5 — 1º incremento ENTREGUE (14/10): conversor RARC
+`runtime/compat/qvx_rarc_conv.c` (`qvx_rarc_beconv`): lê RARC Wii (BE, 4-byte) e
+reescreve no layout exato do motor (LE, u32=8; layouts confirmados via
+`-fdump-record-layouts`), recomputando offsets top-level e preservando os relativos
+(nameOffset/dataOffset), string table e file data verbatim. Alocado no pool baixo
+(`qvx_pool_alloc`, <4GB). Hook local em `mountFixed` (overlay-src). Resultado no
+emulador: a `ErrorMessageArchive` MONTA (`open` ok, mDirs/mStringTable válidos) e o
+boot passa do `createAndAddArchive`. Valida a estratégia (B)/dados. Serve p/ todo
+RARC. Próximos formatos (ordem): BMG, BCSV/JMapInfo, brfnt, nw4r lyt.
+
+## M4 — gráficos (GX): recon (14/10) e estratégia
+Este checkout é o decomp MATCHING (GX = SDK Revolution PPC puro; sem stub x86 — o
+M4 começa do zero aqui). Caminho de boot: `GameSystem::initGX` -> `GXInit(fifo,512KB)`;
+`MainLoopFramework` (beginRender/clearEfb/`GXCopyDisp`/present) + `JUTVideo` (retrace
+via VI callbacks) + `DrawSyncManager`. Primitiva real: `gxfifo` MMIO em 0xCC008000
+(não existe no x86 -> redirecionar p/ FIFO de software). ~60-80 funções GX* até o 1º
+frame, ~150 no total.
+
+**Referência Dusklight:** NÃO escreve tradutor próprio — usa o **Aurora**
+(encounter/aurora, CC0): camada de compat GC/Wii a nível de source (API GX
+reimplementada + FIFO processor + TEV->shader WGSL + present via Dawn/WebGPU ->
+Vulkan/Metal/D3D12, janela SDL3). SMG usa o MESMO SDK GX -> Aurora é reaproveitável.
+
+**Plano M4 (marcos):**
+- M4.0 — **prova de vida**: stub GXInit + `GXSetCopyClear`/`GXCopyDisp` (resolve ->
+  XFB com clear color) + VI (`VISetNextFrameBuffer`/`VIFlush`/`VIWaitForRetrace`)
+  contra o swapchain Vulkan do GnmDriver do shadPS4. Entregável: tela azul
+  (30,30,200) + frameLoop girando com retrace real. Menor esforço p/ 1ª imagem;
+  a camada de present é a mesma do pipeline completo.
+- M4.1 — decisão de backend: testar CEDO se Dawn->Vulkan roda dentro do userland
+  PS4 do shadPS4 (risco #1). Se sim, adotar Aurora encurta M4 em meses. Se não,
+  reusar o DESIGN do Aurora (FIFO + TEV->shader) sobre GNM/Vulkan, sem copiar source
+  (consistente com AGENTS.md: consultar, não incorporar).
+- M4.2 FIFO+geometria mínima -> M4.3 TEV->shader -> M4.4 texturas (CMPR/C4/C8/RGB5A3)
+  -> M4.5 EFB copies. A cauda (~150 funções) é rara.
