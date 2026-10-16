@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+typedef __builtin_va_list __va_list;   /* alguns headers do jogo usam __va_list direto */
 typedef __builtin_va_list va_list;
 
 #ifdef __cplusplus
