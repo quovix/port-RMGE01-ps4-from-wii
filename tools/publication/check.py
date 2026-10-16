@@ -75,7 +75,7 @@ def validate(path, data, mode="100644", private=None):
     documentation = name.suffix == ".md" and name.parts[0] in {"docs", "research", "references", "tools"}
     source = name.suffix in CODE and (
         name.parts[0] in {"tools", "product", "runtime"} or path.startswith("package/src/"))
-    build = path == "package/Makefile"
+    build = path in {"package/Makefile", "package/link_engine.x"}
     hook = path in {".githooks/pre-commit", ".githooks/pre-push"}
     workflow = path.startswith(".github/workflows/") and name.suffix in {".yml", ".yaml"}
     if not any((root_text, documentation, source, build, hook, workflow)):
